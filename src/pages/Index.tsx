@@ -1,40 +1,37 @@
-import LandingPage from '@/components/LandingPage';
-import RoomInterface from '@/components/RoomInterface';
-import { useRoom } from '@/hooks/useRoom';
+import RoomInterface from "@/components/RoomInterface";
+import { useRoom } from "@/hooks/useRoom";
+import LandingPage from "@/components/LandingPage";
 
-const Index = () => {
-  const { 
-    currentRoom, 
-    currentUser, 
-    members, 
-    messages, 
-    loading, 
-    createRoom, 
-    joinRoom, 
-    leaveRoom, 
-    sendMessage 
+export default function IndexPage() {
+  const {
+    currentRoom,
+    currentUser,
+    members,
+    messages,
+    typingUsers,
+    createRoom,
+    joinRoom,
+    leaveRoom,
+    sendMessage,
+    deleteMessage,
+    updateTyping,
   } = useRoom();
 
-  if (currentRoom && currentUser) {
-    return (
-      <RoomInterface 
-        room={currentRoom}
-        currentUser={currentUser}
-        members={members}
-        messages={messages}
-        onLeaveRoom={leaveRoom}
-        onSendMessage={sendMessage}
-      />
-    );
+  if (!currentRoom || !currentUser) {
+    return <LandingPage onCreateRoom={createRoom} onJoinRoom={joinRoom} />;
   }
 
   return (
-    <LandingPage 
-      onJoinRoom={joinRoom}
-      onCreateRoom={createRoom}
-      loading={loading}
+    <RoomInterface
+      room={currentRoom}
+      currentUser={currentUser}
+      members={members}
+      messages={messages}
+      typingUsers={typingUsers}
+      onLeaveRoom={leaveRoom}
+      onSendMessage={sendMessage}
+      onDeleteMessage={deleteMessage}
+      onUpdateTyping={updateTyping}
     />
   );
-};
-
-export default Index;
+}
