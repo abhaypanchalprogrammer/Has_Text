@@ -143,7 +143,7 @@ export default function RoomInterface({
   return (
     <div className="h-screen flex flex-col bg-background">
       {/* Header */}
-      <header className="bg-card border-b border-border px-4 py-3 flex items-center justify-between shadow-chat">
+      <header className="bg-card border-b border-border px-4 py-3 flex items-center justify-between shadow-chat sticky top-0 z-10">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={onLeaveRoom}>
             <ArrowLeft className="h-5 w-5" />
