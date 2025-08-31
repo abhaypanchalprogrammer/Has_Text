@@ -17,6 +17,7 @@ export interface RoomMember {
   joined_at: string;
   last_seen_at: string;
   is_online: boolean;
+  is_typing?: boolean;
 }
 
 export interface Message {
@@ -29,275 +30,186 @@ export interface Message {
 }
 
 export const useRoom = () => {
-  const [currentRoom, setCurrentRoom] = useState<Room | null>(null);
+  const [currentRoom, setCurrentRoom] = useState<Room | null>(() => {
+    const saved = localStorage.getItem("hastext-room");
+    return saved ? (JSON.parse(saved) as Room) : null;
+  });
+
   const [currentUser, setCurrentUser] = useState<{
     id: string;
     displayName: string;
-  } | null>(null);
+  } | null>(() => {
+    const saved = localStorage.getItem("hastext-user");
+    return saved
+      ? (JSON.parse(saved) as { id: string; displayName: string })
+      : null;
+  });
+
   const [members, setMembers] = useState<RoomMember[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const { toast } = useToast();
 
-  // ---- Helpers ----
   const generateRoomCode = () =>
     Math.random().toString(36).substring(2, 8).toUpperCase();
 
-  // robust ID generator with fallback for older browsers
-  const makeRandomId = () => {
-    try {
-      // @ts-ignore - some environments may lack crypto.randomUUID
-      if (
-        typeof crypto !== "undefined" &&
-        typeof crypto.randomUUID === "function"
-      ) {
-        // @ts-ignore
-        return crypto.randomUUID();
-      }
-    } catch {}
-    return `${Date.now().toString(36)}-${Math.random()
-      .toString(36)
-      .slice(2, 10)}`;
-  };
-
-  // persist userId across reloads
-  const getOrCreateUserId = () => {
-    let id = localStorage.getItem("user_id");
-    if (!id) {
-      id = `user-${makeRandomId()}`;
-      localStorage.setItem("user_id", id);
-    }
-    return id;
-  };
-
-  // ---- Persistence of room & user ----
-  useEffect(() => {
-    const savedRoom = localStorage.getItem("currentRoom");
-    const savedUser = localStorage.getItem("currentUser");
-    if (savedRoom) setCurrentRoom(JSON.parse(savedRoom));
-    if (savedUser) setCurrentUser(JSON.parse(savedUser));
-  }, []);
-
-  useEffect(() => {
-    if (currentRoom)
-      localStorage.setItem("currentRoom", JSON.stringify(currentRoom));
-    else localStorage.removeItem("currentRoom");
-
-    if (currentUser)
-      localStorage.setItem("currentUser", JSON.stringify(currentUser));
-    else localStorage.removeItem("currentUser");
-  }, [currentRoom, currentUser]);
-
-  // ---- Create Room (with code retry on collision) ----
+  // --- CREATE ROOM ---
   const createRoom = async (roomName: string, displayName: string) => {
-    setLoading(true);
+    const code = generateRoomCode();
     try {
-      let attempts = 0;
-      let room: Room | null = null;
-      let lastErr: any = null;
+      const { data: room, error } = await supabase
+        .from("rooms")
+        .insert({ code, name: roomName || `Room ${code}` })
+        .select()
+        .single();
+      if (error) throw error;
 
-      while (attempts < 5 && !room) {
-        const code = generateRoomCode();
-        const { data, error } = await supabase
-          .from("rooms")
-          .insert({ code, name: roomName || `Room ${code}` })
-          .select()
-          .single();
-
-        if (!error && data) {
-          room = data as Room;
-
-          // immediately join using the returned room (avoid extra lookup)
-          await joinRoom(data.code, displayName);
-          toast({
-            title: "Room created!",
-            description: `Room code: ${data.code}`,
-          });
-          break;
-        }
-
-        // if unique violation (23505), retry with new code; else surface error
-        if (
-          error &&
-          (error.code === "23505" ||
-            `${error.message}`.toLowerCase().includes("duplicate"))
-        ) {
-          attempts++;
-          lastErr = error;
-          continue;
-        } else if (error) {
-          throw error;
-        }
-      }
-
-      if (!room) {
-        throw lastErr || new Error("Failed to create room. Please try again.");
-      }
-    } catch (error: any) {
+      await joinRoom(code, displayName);
+      toast({ title: "Room created!", description: `Room code: ${code}` });
+    } catch (err: any) {
       toast({
-        title: "Error creating room",
-        description: error?.message ?? "Unknown error",
+        title: "Error",
+        description: err.message,
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
     }
   };
 
-  // ---- Join Room ----
+  // --- JOIN ROOM ---
   const joinRoom = async (roomCode: string, displayName: string) => {
-    setLoading(true);
     try {
       const { data: room, error: roomError } = await supabase
         .from("rooms")
         .select("*")
         .eq("code", roomCode.toUpperCase())
         .single();
-
       if (roomError || !room) throw new Error("Room not found");
 
-      const userId = getOrCreateUserId();
+      const userId =
+        "user-" + Date.now() + "-" + Math.random().toString(36).substring(2, 8);
 
-      // upsert to reuse the same member row for this user_id in this room
       const { error: memberError } = await supabase
         .from("room_members")
-        .upsert({
+        .insert({
           room_id: room.id,
           user_id: userId,
           display_name: displayName,
           is_online: true,
-          last_seen_at: new Date().toISOString(),
+          is_typing: false,
         });
+      if (memberError && (memberError as any).code === "23505") {
+        throw new Error("That name is already taken in this room.");
+      }
 
-      if (memberError) throw memberError;
-
-      setCurrentRoom(room as Room);
+      setCurrentRoom(room);
       setCurrentUser({ id: userId, displayName });
-
-      toast({ title: "Joined room!", description: `Welcome to ${room.name}` });
-    } catch (error: any) {
+      localStorage.setItem("hastext-room", JSON.stringify(room));
+      localStorage.setItem(
+        "hastext-user",
+        JSON.stringify({ id: userId, displayName })
+      );
+    } catch (err: any) {
       toast({
-        title: "Error joining room",
-        description: error?.message ?? "Unknown error",
+        title: "Error",
+        description: err.message,
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
     }
   };
 
-  // ---- Leave Room ----
+  // --- LEAVE ROOM ---
   const leaveRoom = async () => {
-    if (currentUser && currentRoom) {
-      try {
-        await supabase
-          .from("room_members")
-          .update({ is_online: false, last_seen_at: new Date().toISOString() })
-          .eq("room_id", currentRoom.id)
-          .eq("user_id", currentUser.id);
-      } catch (error) {
-        console.error("Error leaving room:", error);
-      }
+    if (currentRoom && currentUser) {
+      await supabase
+        .from("room_members")
+        .update({
+          is_online: false,
+          is_typing: false,
+          last_seen_at: new Date().toISOString(),
+        })
+        .eq("room_id", currentRoom.id)
+        .eq("user_id", currentUser.id);
     }
+    localStorage.removeItem("hastext-room");
+    localStorage.removeItem("hastext-user");
     setCurrentRoom(null);
     setCurrentUser(null);
     setMembers([]);
     setMessages([]);
-    localStorage.removeItem("currentRoom");
-    localStorage.removeItem("currentUser");
   };
 
-  // ---- Send Message ----
+  // --- SEND MESSAGE ---
   const sendMessage = async (text: string) => {
     if (!currentRoom || !currentUser || !text.trim()) return;
-    try {
-      const { error } = await supabase.from("messages").insert({
-        room_id: currentRoom.id,
-        user_id: currentUser.id,
-        display_name: currentUser.displayName,
-        text: text.trim(),
-      });
-      if (error) throw error;
-    } catch (error: any) {
-      toast({
-        title: "Error sending message",
-        description: error?.message ?? "Unknown error",
-        variant: "destructive",
-      });
-    }
+    await supabase.from("messages").insert({
+      room_id: currentRoom.id,
+      user_id: currentUser.id,
+      display_name: currentUser.displayName,
+      text: text.trim(),
+    });
   };
 
-  // ---- Loaders ----
-  const loadMessages = async (roomId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from("messages")
-        .select("*")
-        .eq("room_id", roomId)
-        .order("created_at", { ascending: true });
-      if (error) throw error;
-      setMessages(data || []);
-    } catch (error) {
-      console.error("Error loading messages:", error);
+  // --- DELETE MESSAGE ---
+  const deleteMessage = async (id: string) => {
+    if (!currentRoom || !currentUser) return;
+    const { error } = await supabase
+      .from("messages")
+      .delete()
+      .eq("id", id)
+      .eq("room_id", currentRoom.id)
+      .eq("user_id", currentUser.id);
+    if (error) {
+      toast({
+        title: "Delete failed",
+        description: error.message,
+        variant: "destructive",
+      });
+      return;
     }
+    setMessages((prev) => prev.filter((m) => m.id !== id));
+  };
+
+  // --- LOAD ---
+  const loadMessages = async (roomId: string) => {
+    const { data } = await supabase
+      .from("messages")
+      .select("*")
+      .eq("room_id", roomId)
+      .order("created_at", { ascending: true });
+    setMessages((data as Message[]) || []);
   };
 
   const loadMembers = async (roomId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from("room_members")
-        .select("*")
-        .eq("room_id", roomId)
-        .order("joined_at", { ascending: true });
-      if (error) throw error;
-      setMembers(data || []);
-    } catch (error) {
-      console.error("Error loading members:", error);
-    }
+    const { data } = await supabase
+      .from("room_members")
+      .select("*")
+      .eq("room_id", roomId)
+      .eq("is_online", true);
+    setMembers((data as RoomMember[]) || []);
+    setTypingUsers(
+      (data as RoomMember[])
+        ?.filter((m) => m.is_typing && m.user_id !== currentUser?.id)
+        .map((m) => m.display_name) || []
+    );
   };
 
-  // ---- Presence heartbeat ----
-  const updatePresence = async () => {
+  // --- TYPING ---
+  const updateTyping = async (isTyping: boolean) => {
     if (!currentRoom || !currentUser) return;
-    try {
-      await supabase
-        .from("room_members")
-        .update({ last_seen_at: new Date().toISOString(), is_online: true })
-        .eq("room_id", currentRoom.id)
-        .eq("user_id", currentUser.id);
-    } catch (error) {
-      console.error("Error updating presence:", error);
-    }
+    await supabase
+      .from("room_members")
+      .update({ is_typing: isTyping } as any)
+      .eq("room_id", currentRoom.id)
+      .eq("user_id", currentUser.id);
   };
 
-  // mark offline on tab close/reload
-  useEffect(() => {
-    const handleUnload = async () => {
-      if (currentRoom && currentUser) {
-        try {
-          await supabase
-            .from("room_members")
-            .update({
-              is_online: false,
-              last_seen_at: new Date().toISOString(),
-            })
-            .eq("room_id", currentRoom.id)
-            .eq("user_id", currentUser.id);
-        } catch {}
-      }
-    };
-    window.addEventListener("beforeunload", handleUnload);
-    return () => window.removeEventListener("beforeunload", handleUnload);
-  }, [currentRoom, currentUser]);
-
-  // ---- Realtime subscriptions ----
+  // --- SUBSCRIPTIONS ---
   useEffect(() => {
     if (!currentRoom) return;
-
     loadMessages(currentRoom.id);
     loadMembers(currentRoom.id);
 
-    const messagesChannel = supabase
+    const msgChannel = supabase
       .channel(`messages:${currentRoom.id}`)
       .on(
         "postgres_changes",
@@ -309,9 +221,22 @@ export const useRoom = () => {
         },
         (payload) => setMessages((prev) => [...prev, payload.new as Message])
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "messages",
+          filter: `room_id=eq.${currentRoom.id}`,
+        },
+        (payload) =>
+          setMessages((prev) =>
+            prev.filter((m) => m.id !== (payload.old as Message).id)
+          )
+      )
       .subscribe();
 
-    const membersChannel = supabase
+    const memChannel = supabase
       .channel(`members:${currentRoom.id}`)
       .on(
         "postgres_changes",
@@ -325,24 +250,23 @@ export const useRoom = () => {
       )
       .subscribe();
 
-    const presenceInterval = setInterval(updatePresence, 30000);
-
     return () => {
-      supabase.removeChannel(messagesChannel);
-      supabase.removeChannel(membersChannel);
-      clearInterval(presenceInterval);
+      supabase.removeChannel(msgChannel);
+      supabase.removeChannel(memChannel);
     };
-  }, [currentRoom, currentUser]);
+  }, [currentRoom?.id]);
 
   return {
     currentRoom,
     currentUser,
     members,
     messages,
-    loading,
+    typingUsers,
     createRoom,
     joinRoom,
     leaveRoom,
     sendMessage,
+    deleteMessage,
+    updateTyping,
   };
 };
