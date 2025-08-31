@@ -1,0 +1,133 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* HasText Design System - Real-time messaging app */
+
+@layer base {
+  :root {
+    /* Core App Colors - Modern messaging theme */
+    --background: 240 10% 98%;
+    --foreground: 240 10% 8%;
+
+    /* Chat Interface */
+    --chat-background: 220 13% 95%;
+    --chat-bubble-sent: 262 83% 58%;
+    --chat-bubble-received: 0 0% 100%;
+    --chat-bubble-sent-foreground: 0 0% 100%;
+    --chat-bubble-received-foreground: 240 10% 8%;
+
+    /* Brand Colors */
+    --primary: 262 83% 58%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 262 100% 75%;
+
+    /* UI Elements */
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 8%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 8%;
+
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 240 6% 10%;
+
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 46%;
+
+    --accent: 240 5% 96%;
+    --accent-foreground: 240 6% 10%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 6% 90%;
+    --input: 240 6% 90%;
+    --ring: 262 83% 58%;
+
+    /* Online Status */
+    --online: 142 76% 36%;
+    --offline: 240 4% 46%;
+
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(262 83% 58%), hsl(282 83% 68%));
+    --gradient-hero: linear-gradient(135deg, hsl(262 83% 58%), hsl(282 83% 68%), hsl(302 83% 78%));
+    --gradient-subtle: linear-gradient(180deg, hsl(240 10% 98%), hsl(240 5% 96%));
+
+    /* Shadows */
+    --shadow-chat: 0 2px 8px hsl(240 4% 46% / 0.1);
+    --shadow-elevated: 0 8px 24px hsl(240 4% 46% / 0.15);
+    --shadow-glow: 0 0 24px hsl(262 83% 58% / 0.3);
+
+    --radius: 1rem;
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    /* Dark theme for HasText */
+    --background: 240 10% 8%;
+    --foreground: 240 5% 96%;
+
+    /* Dark Chat Interface */
+    --chat-background: 240 8% 12%;
+    --chat-bubble-sent: 262 83% 58%;
+    --chat-bubble-received: 240 6% 16%;
+    --chat-bubble-sent-foreground: 0 0% 100%;
+    --chat-bubble-received-foreground: 240 5% 96%;
+
+    --card: 240 8% 12%;
+    --card-foreground: 240 5% 96%;
+
+    --popover: 240 8% 12%;
+    --popover-foreground: 240 5% 96%;
+
+    --primary: 262 83% 58%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 240 6% 16%;
+    --secondary-foreground: 240 5% 96%;
+
+    --muted: 240 6% 16%;
+    --muted-foreground: 240 4% 60%;
+
+    --accent: 240 6% 16%;
+    --accent-foreground: 240 5% 96%;
+
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 6% 20%;
+    --input: 240 6% 20%;
+    --ring: 262 83% 58%;
+
+    /* Dark gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(262 83% 58%), hsl(282 83% 68%));
+    --gradient-hero: linear-gradient(135deg, hsl(262 83% 58%), hsl(282 83% 68%), hsl(302 83% 78%));
+    --gradient-subtle: linear-gradient(180deg, hsl(240 10% 8%), hsl(240 8% 12%));
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
