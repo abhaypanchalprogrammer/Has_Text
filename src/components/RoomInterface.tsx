@@ -143,7 +143,7 @@ export default function RoomInterface({
   return (
     <div className="h-screen flex flex-col bg-background">
       {/* Header */}
-      <header className="bg-card border-b border-border px-4 py-3 flex items-center justify-between shadow-chat sticky top-0 z-10">
+      <header className="fixed top-0 left-0 right-0 bg-card border-b border-border px-4 py-3 flex items-center justify-between shadow-chat z-10">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={onLeaveRoom}>
             <ArrowLeft className="h-5 w-5" />
@@ -237,7 +237,7 @@ export default function RoomInterface({
       <div className="flex-1 flex">
         {/* Chat */}
         <div className="flex-1 flex flex-col">
-          <ScrollArea className="flex-1 p-4 bg-chat-background">
+          <ScrollArea className="flex-1 p-4 bg-chat-background pt-[64px] pb-[80px]">
             <div className="space-y-4">
               {(messages || []).map((message) => (
                 <div key={message.id} className="flex flex-col gap-1">
@@ -304,7 +304,7 @@ export default function RoomInterface({
           </ScrollArea>
 
           {/* Input */}
-          <div className="border-t border-border p-4 bg-card sticky bottom-0">
+          <div className="fixed bottom-0 left-0 border-t border-border p-4 bg-card z-20">
             <div className="flex gap-2">
               <Input
                 placeholder="Type a message..."
