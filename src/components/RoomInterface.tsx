@@ -12,6 +12,7 @@ import {
   Settings,
   MoreVertical,
   UserCircle2,
+  Trash2,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -28,8 +29,11 @@ interface RoomInterfaceProps {
   currentUser: { id: string; displayName: string };
   members: RoomMember[];
   messages: Message[];
+  typingUsers: string[];
   onLeaveRoom: () => Promise<void>;
   onSendMessage: (text: string) => Promise<void>;
+  onDeleteMessage: (id: string) => Promise<void>;
+  onUpdateTyping: (isTyping: boolean) => Promise<void>;
 }
 
 export default function RoomInterface({
@@ -37,27 +41,38 @@ export default function RoomInterface({
   currentUser,
   members,
   messages,
+  typingUsers,
   onLeaveRoom,
   onSendMessage,
+  onDeleteMessage,
+  onUpdateTyping,
 }: RoomInterfaceProps) {
   const [messageText, setMessageText] = useState("");
-  const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
-  const scrollToBottom = () => {
+  // auto scroll
+  const scrollToBottom = () =>
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  useEffect(() => scrollToBottom(), [messages]);
 
+  // typing handler
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    if (!messageText) {
+      onUpdateTyping(false);
+      return;
+    }
+    onUpdateTyping(true);
+    const timeout = setTimeout(() => onUpdateTyping(false), 1500);
+    return () => clearTimeout(timeout);
+  }, [messageText]);
 
   const handleSendMessage = async () => {
     if (messageText.trim()) {
       await onSendMessage(messageText.trim());
       setMessageText("");
+      onUpdateTyping(false);
     }
   };
 
@@ -69,7 +84,7 @@ export default function RoomInterface({
   };
 
   const copyAllMessages = () => {
-    const allMessages = messages
+    const allMessages = (messages || [])
       .map(
         (msg) =>
           `[${new Date(msg.created_at).toLocaleTimeString()}] ${
@@ -79,14 +94,11 @@ export default function RoomInterface({
       .join("\n");
 
     navigator.clipboard.writeText(allMessages);
-    toast({
-      title: "Messages copied!",
-      description: "All messages have been copied to your clipboard.",
-    });
+    toast({ title: "Messages copied!", description: "All messages copied." });
   };
 
   const downloadAsText = () => {
-    const allMessages = messages
+    const allMessages = (messages || [])
       .map(
         (msg) =>
           `[${new Date(msg.created_at).toLocaleTimeString()}] ${
@@ -107,18 +119,14 @@ export default function RoomInterface({
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    toast({
-      title: "Download started!",
-      description: "Your conversation history is being downloaded.",
-    });
+    toast({ title: "Download started!", description: "Your chat was saved." });
   };
 
-  const formatTime = (dateString: string) => {
-    return new Date(dateString).toLocaleTimeString([], {
+  const formatTime = (dateString: string) =>
+    new Date(dateString).toLocaleTimeString([], {
       hour: "2-digit",
       minute: "2-digit",
     });
-  };
 
   const formatRelativeTime = (dateString: string) => {
     const now = new Date();
@@ -141,9 +149,9 @@ export default function RoomInterface({
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="font-semibold text-lg">{room.name}</h1>
+            <h1 className="font-semibold text-lg">{room?.name || "Room"}</h1>
             <p className="text-sm text-muted-foreground">
-              Room: {room.code} • {members.filter((m) => m.is_online).length}{" "}
+              Room: {room?.code} • {members.filter((m) => m.is_online).length}{" "}
               online
             </p>
           </div>
@@ -155,7 +163,7 @@ export default function RoomInterface({
             {members.length}
           </Badge>
 
-          {/* Mobile Members Button */}
+          {/* Mobile Members */}
           <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
             <DrawerTrigger asChild>
               <Button variant="ghost" size="icon" className="lg:hidden">
@@ -227,12 +235,11 @@ export default function RoomInterface({
       </header>
 
       <div className="flex-1 flex">
-        {/* Main Chat Area */}
+        {/* Chat */}
         <div className="flex-1 flex flex-col">
-          {/* Messages */}
           <ScrollArea className="flex-1 p-4 bg-chat-background">
             <div className="space-y-4">
-              {messages.map((message) => (
+              {(messages || []).map((message) => (
                 <div key={message.id} className="flex flex-col gap-1">
                   <div
                     className={`flex ${
@@ -242,7 +249,7 @@ export default function RoomInterface({
                     }`}
                   >
                     <div
-                      className={`max-w-[70%] ${
+                      className={`relative max-w-[70%] ${
                         message.user_id === currentUser.id
                           ? "bg-chat-bubble-sent text-chat-bubble-sent-foreground"
                           : "bg-chat-bubble-received text-chat-bubble-received-foreground"
@@ -256,21 +263,31 @@ export default function RoomInterface({
                       <p className="text-sm leading-relaxed whitespace-pre-wrap">
                         {message.text}
                       </p>
-                      <p
-                        className={`text-xs mt-1 ${
-                          message.user_id === currentUser.id
-                            ? "text-chat-bubble-sent-foreground/70"
-                            : "text-chat-bubble-received-foreground/70"
-                        }`}
-                      >
-                        {formatTime(message.created_at)}
-                      </p>
+                      <div className="flex items-center justify-between mt-1">
+                        <p
+                          className={`text-xs ${
+                            message.user_id === currentUser.id
+                              ? "text-chat-bubble-sent-foreground/70"
+                              : "text-chat-bubble-received-foreground/70"
+                          }`}
+                        >
+                          {formatTime(message.created_at)}
+                        </p>
+                        {message.user_id === currentUser.id && (
+                          <button
+                            onClick={() => onDeleteMessage(message.id)}
+                            className="ml-2 text-xs text-red-500 hover:text-red-700"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
               ))}
 
-              {/* Typing Indicator */}
+              {/* Typing */}
               {typingUsers.length > 0 && (
                 <div className="flex justify-start">
                   <div className="bg-chat-bubble-received text-chat-bubble-received-foreground rounded-2xl px-4 py-2 shadow-chat">
@@ -286,7 +303,7 @@ export default function RoomInterface({
             </div>
           </ScrollArea>
 
-          {/* Message Input */}
+          {/* Input */}
           <div className="border-t border-border p-4 bg-card">
             <div className="flex gap-2">
               <Input
@@ -309,7 +326,7 @@ export default function RoomInterface({
           </div>
         </div>
 
-        {/* Members Sidebar (Desktop only) */}
+        {/* Desktop Members */}
         <div className="hidden lg:block w-64 border-l border-border bg-card">
           <div className="p-4">
             <h3 className="font-semibold mb-4 flex items-center gap-2">
