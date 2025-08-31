@@ -304,7 +304,7 @@ export default function RoomInterface({
           </ScrollArea>
 
           {/* Input */}
-          <div className="fixed bottom-0 left-0 border-t border-border p-4 bg-card z-20">
+          <div className="fixed bottom-0 left-0 right-0 w-full border-t border-border p-4 bg-card z-20">
             <div className="flex gap-2">
               <Input
                 placeholder="Type a message..."
